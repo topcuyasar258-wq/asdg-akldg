@@ -78,7 +78,9 @@ def run_scan(queries: list[str], profile_name: str, defaults: dict, dry_run: boo
         if len(leads) >= target:
             log.info("Hedefe ulaşıldı (%d lead) — kalan sorgular atlandı", target)
             break
-        for business in client.search_iter(query, defaults.get("max_results_per_query", 20)):
+        for business in client.search_iter(
+            query, defaults.get("max_results_per_query", 20), skip=store.is_seen
+        ):
             if not business.place_id or store.is_seen(business.place_id):
                 continue
             scanned += 1

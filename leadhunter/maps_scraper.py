@@ -40,9 +40,13 @@ class MapsScraper:
     def search(self, query: str, max_results: int = 20) -> list[Business]:
         return list(self.search_iter(query, max_results))
 
-    def search_iter(self, query: str, max_results: int = 20):
+    def search_iter(self, query: str, max_results: int = 20, skip=None):
         """İşletmeleri buldukça tek tek üretir; tüketici hedefine ulaşınca
-        durabilir ve kalan sayfalar hiç ziyaret edilmez."""
+        durabilir ve kalan sayfalar hiç ziyaret edilmez.
+
+        skip: place_id alıp True dönerse o işletmenin sayfası hiç açılmaz
+        (daha önce raporlananları hızlıca atlamak için).
+        """
         count = 0
         with sync_playwright() as p:
             launch_kwargs: dict = {
@@ -94,6 +98,10 @@ class MapsScraper:
                     for href in links:
                         if count >= max_results:
                             break
+                        if skip is not None:
+                            m = PLACE_ID_RE.search(href)
+                            if m and skip(m.group(0)):
+                                continue  # daha önce raporlandı, sayfayı hiç açma
                         try:
                             b = self._scrape_place(page, href)
                         except (PWTimeout, PWError) as exc:
@@ -136,16 +144,28 @@ class MapsScraper:
             return links
 
         idle_rounds = 0
-        while len(links) < max_results and idle_rounds < 4:
+        while len(links) < max_results and idle_rounds < 8:
             for el in page.locator('a[href*="/maps/place/"]').all():
                 href = el.get_attribute("href") or ""
                 key = href.split("?")[0]
                 if href and key not in seen:
                     seen.add(key)
                     links.append(href)
+
+            # Listenin gerçekten sonuna geldiysek beklemeye gerek yok
+            try:
+                if page.get_by_text(
+                    re.compile("listenin sonuna|end of the list", re.I)
+                ).first.is_visible(timeout=200):
+                    log.info("Sonuç listesinin sonuna ulaşıldı (%d link)", len(links))
+                    break
+            except (PWTimeout, PWError):
+                pass
+
             before = len(links)
-            feed.evaluate("el => el.scrollBy(0, 3000)")
-            page.wait_for_timeout(1_500)
+            # Yeni sonuçların yüklenmesi için listeyi en dibe kaydır
+            feed.evaluate("el => el.scrollTo(0, el.scrollHeight)")
+            page.wait_for_timeout(2_000)
             idle_rounds = idle_rounds + 1 if len(links) == before else 0
 
         return links[:max_results]
@@ -162,6 +182,15 @@ class MapsScraper:
         m = PLACE_ID_RE.search(page.url) or PLACE_ID_RE.search(url)
         place_id = m.group(0) if m else f"name:{name.lower()}"
 
+        # Rapor mesajını kısa tutmak için kompakt harita linki üret
+        maps_url = page.url.split("?")[0]
+        if m:
+            try:
+                cid = int(place_id.split(":")[1], 16)
+                maps_url = f"https://maps.google.com/?cid={cid}"
+            except (IndexError, ValueError):
+                pass
+
         return Business(
             place_id=place_id,
             name=name,
@@ -170,7 +199,7 @@ class MapsScraper:
             website=self._extract_website(page),
             rating=self._extract_rating(page),
             review_count=self._extract_review_count(page),
-            maps_url=page.url.split("?")[0],
+            maps_url=maps_url,
             reviews=self._extract_reviews(page),
         )
 

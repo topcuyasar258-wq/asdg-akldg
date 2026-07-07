@@ -17,13 +17,16 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import requests
 
 log = logging.getLogger(__name__)
 
-# WhatsApp tek mesaj sınırına takılmamak için raporu parçalara böleriz
-MAX_MESSAGE_CHARS = 3500
+# CallMeBot'un ücretsiz servisi uzun mesajları ~1000 karakter civarında
+# kırpıyor; güvenli tarafta kalmak için raporu küçük parçalara böleriz.
+MAX_MESSAGE_CHARS = 800
+DELAY_BETWEEN_CHUNKS = 5  # saniye — sıralamanın karışmaması ve rate limit için
 
 
 def send_report(text: str) -> bool:
@@ -33,13 +36,25 @@ def send_report(text: str) -> bool:
         return False
 
     chunks = _split_message(text)
-    if os.environ.get("CALLMEBOT_API_KEY"):
-        return all(_send_callmebot(to, chunk) for chunk in chunks)
-    if os.environ.get("TWILIO_ACCOUNT_SID"):
-        return all(_send_twilio(to, chunk) for chunk in chunks)
+    total = len(chunks)
+    if total > 1:
+        chunks = [f"[{i}/{total}]\n{chunk}" for i, chunk in enumerate(chunks, 1)]
 
-    log.warning("Ne CALLMEBOT_API_KEY ne TWILIO_ACCOUNT_SID tanımlı — rapor konsola yazılıyor:\n%s", text)
-    return False
+    sender = None
+    if os.environ.get("CALLMEBOT_API_KEY"):
+        sender = _send_callmebot
+    elif os.environ.get("TWILIO_ACCOUNT_SID"):
+        sender = _send_twilio
+    else:
+        log.warning("Ne CALLMEBOT_API_KEY ne TWILIO_ACCOUNT_SID tanımlı — rapor konsola yazılıyor:\n%s", text)
+        return False
+
+    ok = True
+    for i, chunk in enumerate(chunks):
+        if i > 0:
+            time.sleep(DELAY_BETWEEN_CHUNKS)
+        ok = sender(to, chunk) and ok
+    return ok
 
 
 def _split_message(text: str) -> list[str]:

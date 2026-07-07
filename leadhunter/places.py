@@ -72,7 +72,7 @@ class PlacesClient:
     def search(self, query: str, max_results: int = 20) -> list[Business]:
         return list(self.search_iter(query, max_results))
 
-    def search_iter(self, query: str, max_results: int = 20):
+    def search_iter(self, query: str, max_results: int = 20, skip=None):
         """Metin aramasıyla işletmeleri sayfa sayfa bulur ve tek tek üretir."""
         count = 0
         page_token: str | None = None
@@ -103,6 +103,8 @@ class PlacesClient:
             data = resp.json()
             for place in data.get("places", []):
                 if place.get("businessStatus") not in (None, "OPERATIONAL"):
+                    continue
+                if skip is not None and skip(place.get("id", "")):
                     continue
                 if count >= max_results:
                     break
