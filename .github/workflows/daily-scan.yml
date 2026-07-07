@@ -31,6 +31,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Re-run / eşzamanlı çalışmalarda bile en güncel "görülmüşler" listesiyle
+      # başla ki aynı işletmeler ikinci kez bildirilmesin
+      - name: Güncel durum dosyasını al
+        run: |
+          git fetch origin ${{ github.ref_name }} || true
+          git checkout FETCH_HEAD -- data/seen.json 2>/dev/null || true
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -67,7 +74,25 @@ jobs:
           git config user.name "lead-bot"
           git config user.email "bot@veridiareklam.com.tr"
           git add data/seen.json || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F))"
-            git push
+          if git diff --cached --quiet; then
+            exit 0
           fi
+          git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F))"
+          if git push origin HEAD:${{ github.ref_name }}; then
+            exit 0
+          fi
+          # Dal bu sırada ilerlediyse: uzak seen.json ile bizimkini birleştir
+          cp data/seen.json /tmp/local_seen.json
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard FETCH_HEAD
+          python - <<'PY'
+          import json
+          remote = json.load(open("data/seen.json"))
+          local = json.load(open("/tmp/local_seen.json"))
+          remote.update(local)
+          with open("data/seen.json", "w", encoding="utf-8") as f:
+              json.dump(remote, f, ensure_ascii=False, indent=1, sort_keys=True)
+          PY
+          git add data/seen.json
+          git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F), birleştirildi)"
+          git push origin HEAD:${{ github.ref_name }}
