@@ -12,6 +12,11 @@ on:
       query:
         description: "Tek seferlik özel arama (örn: 'kafe Moda İstanbul')"
         required: false
+      dry_run:
+        description: "Test modu: WhatsApp göndermeden konsola yaz"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -32,10 +37,13 @@ jobs:
           cache: pip
 
       - name: Bağımlılıkları kur
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
 
       - name: Taramayı çalıştır
         env:
+          # Opsiyonel — tanımlı değilse ücretsiz tarayıcı modu kullanılır
           GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
           WHATSAPP_TO: ${{ secrets.WHATSAPP_TO }}
           CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
@@ -48,6 +56,9 @@ jobs:
             ARGS="--profile ${{ github.event.inputs.profile }}"
           elif [ -n "${{ github.event.inputs.query }}" ]; then
             ARGS="--query \"${{ github.event.inputs.query }}\""
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
           fi
           eval python main.py $ARGS
 

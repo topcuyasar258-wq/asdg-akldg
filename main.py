@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -52,11 +53,22 @@ def pick_profile(config: dict, name: str | None) -> dict | None:
     return None
 
 
+def make_client(defaults: dict):
+    """Veri kaynağını seçer: API anahtarı varsa resmi Places API,
+    yoksa (varsayılan) tamamen ücretsiz tarayıcı tabanlı Maps scraper."""
+    language = defaults.get("language", "tr")
+    region = defaults.get("region", "tr")
+    if os.environ.get("GOOGLE_PLACES_API_KEY"):
+        log.info("Veri kaynağı: Google Places API")
+        return PlacesClient(language=language, region=region)
+    from leadhunter.maps_scraper import MapsScraper
+
+    log.info("Veri kaynağı: ücretsiz Google Maps tarayıcısı (API anahtarı yok)")
+    return MapsScraper(language=language, region=region)
+
+
 def run_scan(queries: list[str], profile_name: str, defaults: dict, dry_run: bool) -> None:
-    client = PlacesClient(
-        language=defaults.get("language", "tr"),
-        region=defaults.get("region", "tr"),
-    )
+    client = make_client(defaults)
     store = SeenStore()
     leads: list[Lead] = []
     scanned = 0

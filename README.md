@@ -2,9 +2,15 @@
 
 Google Maps'teki işletmeleri her gün otomatik tarayıp **potansiyel müşterileri tespit eden** ve size **WhatsApp raporu** gönderen sistem.
 
+**💸 Tamamen ücretsiz çalışır** — kredi kartı, API ücreti, sunucu kirası yok:
+
+- Veri toplama: tarayıcı tabanlı Google Maps okuyucu (Playwright) → ücretsiz
+- Çalıştırma: GitHub Actions (public repoda sınırsız, private repoda ayda 2000 dk ücretsiz) → ücretsiz
+- WhatsApp: CallMeBot → ücretsiz
+
 ## Ne yapar?
 
-1. **Google Maps taraması** — Resmi Google Places API ile işletmeleri bulur (isim, telefon, adres, puan, yorumlar, web sitesi).
+1. **Google Maps taraması** — İşletmeleri bulur: isim, telefon, adres, puan, yorumlar, web sitesi. Varsayılan olarak gerçek bir tarayıcıyla Maps arayüzünü okur (ücretsiz); `GOOGLE_PLACES_API_KEY` tanımlarsanız resmi Places API'ye geçer (daha stabil, ama Google Cloud hesabı ister).
 2. **Yorum analizi** — Yorum sayısı, ortalama puan ve Türkçe şikayet sinyallerini değerlendirir.
 3. **Web sitesi analizi** — Site var mı, açılıyor mu, SSL'i var mı, mobil uyumlu mu, yavaş mı?
 4. **Sosyal medya tespiti** — Sitedeki Instagram / Facebook / X / LinkedIn / YouTube hesaplarını bulur.
@@ -12,15 +18,9 @@ Google Maps'teki işletmeleri her gün otomatik tarayıp **potansiyel müşteril
 6. **WhatsApp raporu** — En iyi lead'leri işletme telefonuyla birlikte numaranıza iletir.
 7. **Tekrarsız günlük çalışma** — GitHub Actions her sabah 09:00'da (TR) çalışır; daha önce bildirilen işletmeler bir daha bildirilmez.
 
-## Kurulum
+## Kurulum (5 dakika, tamamen ücretsiz)
 
-### 1. Google Places API anahtarı
-
-1. [Google Cloud Console](https://console.cloud.google.com/) → proje oluşturun.
-2. **Places API (New)**'i etkinleştirin.
-3. API anahtarı oluşturun.
-
-### 2. WhatsApp (CallMeBot — ücretsiz, önerilen)
+### 1. WhatsApp (CallMeBot)
 
 1. Telefonunuzdan **+34 621 331 709** numarasını rehbere ekleyin.
 2. Bu numaraya WhatsApp'tan şu mesajı gönderin: `I allow callmebot to send me messages`
@@ -29,18 +29,18 @@ Google Maps'teki işletmeleri her gün otomatik tarayıp **potansiyel müşteril
 
 Alternatif olarak kurumsal kullanım için Twilio WhatsApp API da desteklenir.
 
-### 3. GitHub Secrets
+### 2. GitHub Secrets
 
 Repo → **Settings → Secrets and variables → Actions** altına ekleyin:
 
 | Secret | Açıklama | Zorunlu |
 |---|---|---|
-| `GOOGLE_PLACES_API_KEY` | Google Places API anahtarı | ✅ |
 | `WHATSAPP_TO` | Raporun gideceği numara, örn. `+90532xxxxxxx` | ✅ |
 | `CALLMEBOT_API_KEY` | CallMeBot anahtarı | ✅ (veya Twilio) |
+| `GOOGLE_PLACES_API_KEY` | Opsiyonel: resmi API'ye geçmek isterseniz | ❌ |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | Twilio kullanacaksanız | ❌ |
 
-Bunlar tamamlandığında sistem her gün kendiliğinden çalışır — başka bir şey yapmanıza gerek yok.
+Bu iki secret tamamlandığında sistem her gün kendiliğinden çalışır — başka bir şey yapmanıza gerek yok. İlk denemeyi **Actions → Günlük Lead Taraması → Run workflow** ekranında `dry_run` işaretleyerek WhatsApp'a göndermeden yapabilirsiniz; rapor Actions log'unda görünür.
 
 ## Tarama profilleri
 
@@ -66,7 +66,7 @@ Bilgisayarınızda test için:
 
 ```bash
 pip install -r requirements.txt
-export GOOGLE_PLACES_API_KEY="..."
+python -m playwright install chromium
 python main.py --query "kafe Moda İstanbul" --dry-run   # WhatsApp göndermeden dene
 python main.py --profile saglik                          # belirli profili çalıştır
 ```
@@ -103,6 +103,8 @@ python main.py --profile saglik                          # belirli profili çal�
 
 `min_lead_score` (varsayılan 40) üzerindeki işletmeler rapora girer; telefonu olmayanlar elenir.
 
-## ⚠️ Önemli not
+## ⚠️ Önemli notlar
+
+**Tarayıcı modu hakkında:** Ücretsiz mod Google Maps'in web arayüzünü okuduğu için Google arayüzü değiştirdiğinde bazı alanlar (örn. yorum metinleri) geçici olarak boş gelebilir; sistem bu durumda durmaz, okuyabildiği verilerle devam eder. Yoğun/kesintisiz kullanım ve tam stabilite isterseniz `GOOGLE_PLACES_API_KEY` ekleyerek resmi API'ye geçebilirsiniz (Google Cloud'un aylık ücretsiz kotası çoğu zaman yeterlidir, ancak hesap açılışında kart ister).
 
 Bu sistem lead'leri **size** raporlar. Tespit edilen işletmelere toplu/otomatik mesaj gönderimi yapmaz ve yapılmamalıdır — Türkiye'de ticari elektronik ileti için 6563 sayılı kanun (İYS) kapsamında alıcı onayı gerekir. İletişimi ekibiniz birebir kurmalıdır.
