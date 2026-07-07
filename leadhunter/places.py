@@ -56,6 +56,7 @@ class Business:
     review_count: int = 0
     maps_url: str = ""
     reviews: list[Review] = field(default_factory=list)
+    unclaimed: bool = False  # "Bu işletmenin sahibi misiniz?" ibaresi görüldüyse
 
 
 class PlacesClient:

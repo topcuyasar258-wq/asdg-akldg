@@ -7,7 +7,9 @@ from datetime import date
 from .scorer import Lead
 
 
-def format_report(profile_name: str, leads: list[Lead], scanned_count: int) -> str:
+def format_report(
+    profile_name: str, leads: list[Lead], scanned_count: int, sheet_url: str = ""
+) -> str:
     today = date.today().strftime("%d.%m.%Y")
     lines = [
         f"🎯 *VERİDİA REKLAM — Günlük Lead Raporu*",
@@ -38,5 +40,9 @@ def format_report(profile_name: str, leads: list[Lead], scanned_count: int) -> s
             lines.append(f'💬 Örnek şikayet: "{lead.reviews.negative_snippets[0]}"')
         if b.maps_url:
             lines.append(f"🗺️ {b.maps_url}")
+
+    if sheet_url:
+        lines.append("")
+        lines.append(f"✍️ *Tıkla-gönder ulaşım sayfası:*\n{sheet_url}")
 
     return "\n".join(lines)

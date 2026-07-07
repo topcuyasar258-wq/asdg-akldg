@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from leadhunter.outreach_sheet import github_url_for, write_sheet
+from leadhunter.pipeline import append_leads
 from leadhunter.places import PlacesClient
 from leadhunter.report import format_report
 from leadhunter.reviews import analyze_reviews
@@ -100,14 +102,23 @@ def run_scan(queries: list[str], profile_name: str, defaults: dict, dry_run: boo
                     log.info("Hedef lead sayısına ulaşıldı (%d) — tarama durduruluyor", target)
                     break
 
-    leads.sort(key=lambda l: l.score, reverse=True)
+    # Prime (başarılı ama görünmez) lead'ler her zaman en üstte
+    leads.sort(key=lambda l: (l.is_prime, l.score), reverse=True)
     leads = leads[: defaults.get("max_leads_per_report", 10)]
 
-    text = format_report(profile_name, leads, scanned)
+    # Tıkla-gönder ulaşım sayfası + kalıcı CSV pipeline
+    sheet_url = ""
+    if leads and not dry_run:
+        sheet_path = write_sheet(profile_name, leads)
+        sheet_url = github_url_for(sheet_path)
+        append_leads(profile_name, leads)
+        log.info("Ulaşım sayfası ve leads.csv güncellendi (%d lead)", len(leads))
+
+    text = format_report(profile_name, leads, scanned, sheet_url=sheet_url)
     print("\n" + text + "\n")
 
     if dry_run:
-        log.info("Dry-run: WhatsApp gönderimi atlandı, durum dosyası kaydedilmedi.")
+        log.info("Dry-run: WhatsApp/ulaşım sayfası/CSV atlandı.")
         return
 
     send_report(text)

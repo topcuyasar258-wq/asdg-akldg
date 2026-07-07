@@ -56,6 +56,8 @@ class WebsiteReport:
     mobile_friendly: bool = False
     load_time_seconds: float | None = None
     title: str = ""
+    has_meta_description: bool = False   # SEO: arama sonucu açıklaması var mı
+    has_analytics: bool = False          # Google Analytics / GTM / Meta Pixel kurulu mu
     socials: dict[str, str] = field(default_factory=dict)
     error: str = ""
 
@@ -91,12 +93,37 @@ def analyze_website(url: str) -> WebsiteReport:
                 report.title = soup.title.string.strip()[:100]
             viewport = soup.find("meta", attrs={"name": "viewport"})
             report.mobile_friendly = viewport is not None
+
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            report.has_meta_description = bool(
+                meta_desc and (meta_desc.get("content") or "").strip()
+            )
+            report.has_analytics = _has_analytics(resp.text)
             _extract_socials(resp.text, report.socials)
     except requests.RequestException as exc:
         report.error = type(exc).__name__
         log.debug("Site erişilemedi (%s): %s", url, exc)
 
     return report
+
+
+# Sitede kurulu ölçümleme araçlarının imzaları
+_ANALYTICS_SIGNATURES = (
+    "google-analytics.com",
+    "googletagmanager.com",
+    "gtag(",
+    "gtag/js",
+    "ga('create'",
+    "connect.facebook.net",
+    "fbq(",
+    "yandex.ru/metrika",
+    "ym(",
+)
+
+
+def _has_analytics(html: str) -> bool:
+    lowered = html.lower()
+    return any(sig in lowered for sig in _ANALYTICS_SIGNATURES)
 
 
 def _extract_socials(html: str, socials: dict[str, str]) -> None:

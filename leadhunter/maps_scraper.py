@@ -201,7 +201,19 @@ class MapsScraper:
             review_count=self._extract_review_count(page),
             maps_url=maps_url,
             reviews=self._extract_reviews(page),
+            unclaimed=self._is_unclaimed(page),
         )
+
+    @staticmethod
+    def _is_unclaimed(page: Page) -> bool:
+        """Profil sahibi tarafından sahiplenilmemişse Maps 'Bu işletmenin
+        sahibi misiniz?' bağlantısını gösterir — en kolay satış sinyali."""
+        try:
+            return page.get_by_text(
+                re.compile(r"sahibi misiniz|Kendi işletmeniz mi|own this business|Claim this business", re.I)
+            ).first.is_visible(timeout=500)
+        except (PWTimeout, PWError):
+            return False
 
     @staticmethod
     def _item_text(page: Page, item_id: str) -> str:

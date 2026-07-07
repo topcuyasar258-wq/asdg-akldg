@@ -69,30 +69,57 @@ jobs:
           fi
           eval python main.py $ARGS
 
-      - name: Durum dosyasını commitle (tekrar bildirimi engelle)
+      - name: Tarama çıktılarını commitle (durum, leads.csv, ulaşım sayfaları)
         run: |
           git config user.name "lead-bot"
           git config user.email "bot@veridiareklam.com.tr"
-          git add data/seen.json || true
+          git add data/ || true
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F))"
+          git commit -m "chore: günlük tarama çıktıları ($(date +%F))"
           if git push origin HEAD:${{ github.ref_name }}; then
             exit 0
           fi
-          # Dal bu sırada ilerlediyse: uzak seen.json ile bizimkini birleştir
-          cp data/seen.json /tmp/local_seen.json
+          # Dal bu sırada ilerlediyse: yerel data/ çıktılarını yedekle, uzak ile birleştir
+          rm -rf /tmp/data_local && cp -r data /tmp/data_local
           git fetch origin ${{ github.ref_name }}
           git reset --hard FETCH_HEAD
           python - <<'PY'
-          import json
-          remote = json.load(open("data/seen.json"))
-          local = json.load(open("/tmp/local_seen.json"))
-          remote.update(local)
+          import json, csv, glob, os, shutil
+
+          # seen.json: uzak + yerel birleştir
+          def load_json(p):
+              try:
+                  return json.load(open(p, encoding="utf-8"))
+              except (OSError, ValueError):
+                  return {}
+          remote = load_json("data/seen.json")
+          remote.update(load_json("/tmp/data_local/seen.json"))
+          os.makedirs("data", exist_ok=True)
           with open("data/seen.json", "w", encoding="utf-8") as f:
               json.dump(remote, f, ensure_ascii=False, indent=1, sort_keys=True)
+
+          # leads.csv: uzak satırların üstüne yerelden eksik satırları ekle
+          def read_lines(p):
+              return open(p, encoding="utf-8").read().splitlines() if os.path.exists(p) else []
+          remote_rows = read_lines("data/leads.csv")
+          local_rows = read_lines("/tmp/data_local/leads.csv")
+          if local_rows:
+              header = local_rows[0]
+              existing = set(remote_rows)
+              merged = remote_rows or [header]
+              for row in local_rows[1:]:
+                  if row not in existing:
+                      merged.append(row)
+              with open("data/leads.csv", "w", encoding="utf-8") as f:
+                  f.write("\n".join(merged) + "\n")
+
+          # outreach sayfaları: benzersiz isimli, doğrudan kopyala
+          for src in glob.glob("/tmp/data_local/outreach/*.md"):
+              os.makedirs("data/outreach", exist_ok=True)
+              shutil.copy(src, os.path.join("data/outreach", os.path.basename(src)))
           PY
-          git add data/seen.json
-          git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F), birleştirildi)"
+          git add data/
+          git commit -m "chore: günlük tarama çıktıları ($(date +%F), birleştirildi)"
           git push origin HEAD:${{ github.ref_name }}
