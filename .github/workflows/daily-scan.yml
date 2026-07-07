@@ -1,0 +1,62 @@
+name: Günlük Lead Taraması
+
+on:
+  schedule:
+    # Her gün 06:00 UTC = 09:00 Türkiye saati
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Profil adı (boş bırakılırsa günün profili çalışır)"
+        required: false
+      query:
+        description: "Tek seferlik özel arama (örn: 'kafe Moda İstanbul')"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Bağımlılıkları kur
+        run: pip install -r requirements.txt
+
+      - name: Taramayı çalıştır
+        env:
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          WHATSAPP_TO: ${{ secrets.WHATSAPP_TO }}
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.profile }}" ]; then
+            ARGS="--profile ${{ github.event.inputs.profile }}"
+          elif [ -n "${{ github.event.inputs.query }}" ]; then
+            ARGS="--query \"${{ github.event.inputs.query }}\""
+          fi
+          eval python main.py $ARGS
+
+      - name: Durum dosyasını commitle (tekrar bildirimi engelle)
+        run: |
+          git config user.name "lead-bot"
+          git config user.email "bot@veridiareklam.com.tr"
+          git add data/seen.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: günlük tarama durum güncellemesi ($(date +%F))"
+            git push
+          fi

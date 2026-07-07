@@ -1,0 +1,63 @@
+# veridiareklam.com.tr — Tarama Profilleri
+#
+# Her profil farklı bir sektör/bölge taramasıdır. "days" alanı profilin
+# haftanın hangi günleri çalışacağını belirler (0=Pazartesi ... 6=Pazar).
+# Böylece her gün farklı bir tarama yapılır, aynı işletmeler tekrar taranmaz.
+
+defaults:
+  language: tr
+  region: tr
+  max_results_per_query: 20     # her arama sorgusu için işlenecek işletme sayısı
+  max_leads_per_report: 10      # WhatsApp raporuna girecek maksimum lead
+  min_lead_score: 40            # bu puanın altındakiler rapora girmez
+  require_phone: true           # telefonu olmayan işletme lead sayılmaz
+
+profiles:
+  - name: restoran-kafe
+    days: [0]                   # Pazartesi
+    queries:
+      - "restoran Kadıköy İstanbul"
+      - "kafe Beşiktaş İstanbul"
+      - "restoran Çankaya Ankara"
+
+  - name: guzellik-bakim
+    days: [1]                   # Salı
+    queries:
+      - "güzellik salonu Şişli İstanbul"
+      - "kuaför Üsküdar İstanbul"
+      - "berber Karşıyaka İzmir"
+
+  - name: saglik
+    days: [2]                   # Çarşamba
+    queries:
+      - "diş kliniği Ataşehir İstanbul"
+      - "veteriner Bornova İzmir"
+      - "fizik tedavi merkezi Ankara"
+
+  - name: hizmet-sektoru
+    days: [3]                   # Perşembe
+    queries:
+      - "emlak ofisi Beylikdüzü İstanbul"
+      - "oto servis Bursa"
+      - "nakliyat firması Ankara"
+
+  - name: perakende
+    days: [4]                   # Cuma
+    queries:
+      - "mobilya mağazası İnegöl Bursa"
+      - "butik Nişantaşı İstanbul"
+      - "çiçekçi Antalya"
+
+  - name: egitim-spor
+    days: [5]                   # Cumartesi
+    queries:
+      - "özel ders kursu Kadıköy İstanbul"
+      - "spor salonu Bağdat Caddesi İstanbul"
+      - "yoga stüdyosu İzmir"
+
+  - name: konaklama-turizm
+    days: [6]                   # Pazar
+    queries:
+      - "butik otel Alaçatı"
+      - "pansiyon Kaş Antalya"
+      - "tur acentesi Kapadokya"
