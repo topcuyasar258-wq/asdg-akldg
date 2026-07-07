@@ -70,16 +70,19 @@ class PlacesClient:
         self.session = requests.Session()
 
     def search(self, query: str, max_results: int = 20) -> list[Business]:
-        """Metin aramasıyla işletmeleri bulur (sayfalama dahil)."""
-        businesses: list[Business] = []
+        return list(self.search_iter(query, max_results))
+
+    def search_iter(self, query: str, max_results: int = 20):
+        """Metin aramasıyla işletmeleri sayfa sayfa bulur ve tek tek üretir."""
+        count = 0
         page_token: str | None = None
 
-        while len(businesses) < max_results:
+        while count < max_results:
             body: dict = {
                 "textQuery": query,
                 "languageCode": self.language,
                 "regionCode": self.region.upper(),
-                "pageSize": min(20, max_results - len(businesses)),
+                "pageSize": min(20, max_results - count),
             }
             if page_token:
                 body["pageToken"] = page_token
@@ -101,15 +104,17 @@ class PlacesClient:
             for place in data.get("places", []):
                 if place.get("businessStatus") not in (None, "OPERATIONAL"):
                     continue
-                businesses.append(self._parse_place(place))
+                if count >= max_results:
+                    break
+                count += 1
+                yield self._parse_place(place)
 
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
             time.sleep(1)  # sayfa token'ının aktifleşmesi için kısa bekleme
 
-        log.info("'%s' sorgusu: %d işletme bulundu", query, len(businesses))
-        return businesses[:max_results]
+        log.info("'%s' sorgusu: %d işletme bulundu", query, count)
 
     @staticmethod
     def _parse_place(place: dict) -> Business:

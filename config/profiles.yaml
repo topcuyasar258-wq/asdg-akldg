@@ -7,7 +7,8 @@
 defaults:
   language: tr
   region: tr
-  max_results_per_query: 20     # her arama sorgusu için işlenecek işletme sayısı
+  max_results_per_query: 60     # her arama sorgusu için taranabilecek maksimum işletme
+  target_leads: 10              # bu sayıda lead bulunana kadar tarama derinleşir
   max_leads_per_report: 10      # WhatsApp raporuna girecek maksimum lead
   min_lead_score: 40            # bu puanın altındakiler rapora girmez
   require_phone: true           # telefonu olmayan işletme lead sayılmaz

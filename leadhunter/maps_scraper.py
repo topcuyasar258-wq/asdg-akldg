@@ -38,7 +38,12 @@ class MapsScraper:
         self.language = language
 
     def search(self, query: str, max_results: int = 20) -> list[Business]:
-        businesses: list[Business] = []
+        return list(self.search_iter(query, max_results))
+
+    def search_iter(self, query: str, max_results: int = 20):
+        """İşletmeleri buldukça tek tek üretir; tüketici hedefine ulaşınca
+        durabilir ve kalan sayfalar hiç ziyaret edilmez."""
+        count = 0
         with sync_playwright() as p:
             launch_kwargs: dict = {
                 "headless": True,
@@ -81,25 +86,29 @@ class MapsScraper:
                     # Sorgu tek bir işletmeye yönlendirdi
                     b = self._scrape_place(page, page.url)
                     if b:
-                        businesses.append(b)
+                        count += 1
+                        yield b
                 else:
                     links = self._collect_place_links(page, max_results)
                     log.info("'%s' sorgusu: %d işletme linki bulundu", query, len(links))
                     for href in links:
+                        if count >= max_results:
+                            break
                         try:
                             b = self._scrape_place(page, href)
-                            if b:
-                                businesses.append(b)
                         except (PWTimeout, PWError) as exc:
                             log.warning("İşletme sayfası okunamadı: %s (%s)", href[:80], type(exc).__name__)
+                            continue
+                        if b:
+                            count += 1
+                            yield b
                         time.sleep(1.5)  # nazik tarama
             except (PWTimeout, PWError) as exc:
                 log.error("'%s' sorgusunda tarayıcı hatası: %s", query, exc)
             finally:
                 browser.close()
 
-        log.info("'%s' sorgusu: %d işletme toplandı", query, len(businesses))
-        return businesses[:max_results]
+        log.info("'%s' sorgusu: %d işletme tarandı", query, count)
 
     # ------------------------------------------------------------------
 

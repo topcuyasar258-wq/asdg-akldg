@@ -72,9 +72,13 @@ def run_scan(queries: list[str], profile_name: str, defaults: dict, dry_run: boo
     store = SeenStore()
     leads: list[Lead] = []
     scanned = 0
+    target = defaults.get("target_leads", defaults.get("max_leads_per_report", 10))
 
     for query in queries:
-        for business in client.search(query, defaults.get("max_results_per_query", 20)):
+        if len(leads) >= target:
+            log.info("Hedefe ulaşıldı (%d lead) — kalan sorgular atlandı", target)
+            break
+        for business in client.search_iter(query, defaults.get("max_results_per_query", 20)):
             if not business.place_id or store.is_seen(business.place_id):
                 continue
             scanned += 1
@@ -86,10 +90,13 @@ def run_scan(queries: list[str], profile_name: str, defaults: dict, dry_run: boo
             web = analyze_website(business.website)
             rev = analyze_reviews(business.rating, business.review_count, business.reviews)
             lead = score_lead(business, web, rev)
-            log.info("%-40s skor=%d", business.name[:40], lead.score)
+            log.info("%-40s skor=%d (lead %d/%d)", business.name[:40], lead.score, len(leads), target)
 
             if lead.score >= defaults.get("min_lead_score", 40):
                 leads.append(lead)
+                if len(leads) >= target:
+                    log.info("Hedef lead sayısına ulaşıldı (%d) — tarama durduruluyor", target)
+                    break
 
     leads.sort(key=lambda l: l.score, reverse=True)
     leads = leads[: defaults.get("max_leads_per_report", 10)]
