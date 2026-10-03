@@ -1,0 +1,82 @@
+# veridiareklam.com.tr — Tarama Profilleri
+#
+# Her profil farklı bir sektör/bölge taramasıdır. "days" alanı profilin
+# haftanın hangi günleri çalışacağını belirler (0=Pazartesi ... 6=Pazar).
+#
+# STRATEJİ:
+# - Coğrafya: İki kişilik İstanbul ajansı olduğunuz için yüz yüze toplantı
+#   kapatma oranı yüksek olsun diye ağırlık İSTANBUL'da, ilçe ilçe derinleşir.
+#   Şehir dışı yalnızca uzaktan satılabilen hizmetlere (SEO, sosyal medya)
+#   ayrılmıştır ve haftada tek gündür.
+# - Sektör (LTV): Müşteri başı geliri yüksek sektörlere (diş/estetik, emlak,
+#   hukuk/danışmanlık, özel eğitim) haftada 2-3 gün ayrılır; düşük bütçeli
+#   sektörler (kafe, butik, perakende) tek güne sıkıştırılmıştır.
+
+defaults:
+  language: tr
+  region: tr
+  max_results_per_query: 60     # her arama sorgusu için taranabilecek maksimum işletme
+  target_leads: 10              # bu sayıda lead bulunana kadar tarama derinleşir
+  max_leads_per_report: 10      # WhatsApp raporuna girecek maksimum lead
+  min_lead_score: 40            # bu puanın altındakiler rapora girmez
+  require_phone: true           # telefonu olmayan işletme lead sayılmaz
+
+profiles:
+  # ---- YÜKSEK LTV: SAĞLIK & ESTETİK (haftada 2 gün) ----
+  - name: saglik-estetik-istanbul
+    days: [0, 2]                 # Pazartesi & Çarşamba
+    queries:
+      - "diş kliniği Kadıköy İstanbul"
+      - "estetik merkezi Şişli İstanbul"
+      - "güzellik merkezi Nişantaşı İstanbul"
+      - "diş kliniği Ataşehir İstanbul"
+      - "saç ekim merkezi Beşiktaş İstanbul"
+      - "fizik tedavi Ümraniye İstanbul"
+      - "diş kliniği Bakırköy İstanbul"
+      - "estetik klinik Maltepe İstanbul"
+
+  # ---- YÜKSEK LTV: EMLAK, HUKUK & DANIŞMANLIK (haftada 2 gün) ----
+  - name: emlak-hukuk-istanbul
+    days: [1, 4]                 # Salı & Cuma
+    queries:
+      - "emlak ofisi Beylikdüzü İstanbul"
+      - "avukat bürosu Kadıköy İstanbul"
+      - "mali müşavir Şişli İstanbul"
+      - "emlak ofisi Başakşehir İstanbul"
+      - "hukuk bürosu Ataşehir İstanbul"
+      - "gayrimenkul danışmanlık Beşiktaş İstanbul"
+      - "emlak ofisi Ümraniye İstanbul"
+      - "danışmanlık ofisi Maslak İstanbul"
+
+  # ---- ORTA-YÜKSEK LTV: ÖZEL EĞİTİM (haftada 1 gün) ----
+  - name: egitim-istanbul
+    days: [3]                    # Perşembe
+    queries:
+      - "özel kurs Kadıköy İstanbul"
+      - "sürücü kursu Bahçelievler İstanbul"
+      - "özel anaokulu Ataşehir İstanbul"
+      - "dil kursu Şişli İstanbul"
+      - "etüt merkezi Ümraniye İstanbul"
+      - "müzik kursu Beşiktaş İstanbul"
+
+  # ---- DÜŞÜK LTV: YEME-İÇME & PERAKENDE (tek güne sıkıştırıldı) ----
+  - name: perakende-kafe-istanbul
+    days: [5]                    # Cumartesi
+    queries:
+      - "restoran Kadıköy İstanbul"
+      - "kafe Beşiktaş İstanbul"
+      - "butik Nişantaşı İstanbul"
+      - "mobilya mağazası Masko İstanbul"
+      - "çiçekçi Bakırköy İstanbul"
+      - "kuaför Üsküdar İstanbul"
+
+  # ---- ŞEHİR DIŞI: yalnızca uzaktan satılabilir hizmetler (SEO/sosyal medya) ----
+  # Yüz yüze toplantı gerektirmez; web tasarım + sosyal medya + SEO ile satılır.
+  - name: sehirdisi-uzaktan
+    days: [6]                    # Pazar
+    queries:
+      - "diş kliniği Çankaya Ankara"
+      - "emlak ofisi Bornova İzmir"
+      - "estetik merkezi Nilüfer Bursa"
+      - "otel Muratpaşa Antalya"
+      - "avukat bürosu Konak İzmir"

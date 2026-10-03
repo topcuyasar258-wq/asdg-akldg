@@ -1,0 +1,125 @@
+name: Günlük Lead Taraması
+
+on:
+  schedule:
+    # Her gün 06:00 UTC = 09:00 Türkiye saati
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Profil adı (boş bırakılırsa günün profili çalışır)"
+        required: false
+      query:
+        description: "Tek seferlik özel arama (örn: 'kafe Moda İstanbul')"
+        required: false
+      dry_run:
+        description: "Test modu: WhatsApp göndermeden konsola yaz"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Re-run / eşzamanlı çalışmalarda bile en güncel "görülmüşler" listesiyle
+      # başla ki aynı işletmeler ikinci kez bildirilmesin
+      - name: Güncel durum dosyasını al
+        run: |
+          git fetch origin ${{ github.ref_name }} || true
+          git checkout FETCH_HEAD -- data/seen.json 2>/dev/null || true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Bağımlılıkları kur
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Taramayı çalıştır
+        env:
+          # Opsiyonel — tanımlı değilse ücretsiz tarayıcı modu kullanılır
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          WHATSAPP_TO: ${{ secrets.WHATSAPP_TO }}
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.profile }}" ]; then
+            ARGS="--profile ${{ github.event.inputs.profile }}"
+          elif [ -n "${{ github.event.inputs.query }}" ]; then
+            ARGS="--query \"${{ github.event.inputs.query }}\""
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          eval python main.py $ARGS
+
+      - name: Tarama çıktılarını commitle (durum, leads.csv, ulaşım sayfaları)
+        run: |
+          git config user.name "lead-bot"
+          git config user.email "bot@veridiareklam.com.tr"
+          git add data/ || true
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: günlük tarama çıktıları ($(date +%F))"
+          if git push origin HEAD:${{ github.ref_name }}; then
+            exit 0
+          fi
+          # Dal bu sırada ilerlediyse: yerel data/ çıktılarını yedekle, uzak ile birleştir
+          rm -rf /tmp/data_local && cp -r data /tmp/data_local
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard FETCH_HEAD
+          python - <<'PY'
+          import json, csv, glob, os, shutil
+
+          # seen.json: uzak + yerel birleştir
+          def load_json(p):
+              try:
+                  return json.load(open(p, encoding="utf-8"))
+              except (OSError, ValueError):
+                  return {}
+          remote = load_json("data/seen.json")
+          remote.update(load_json("/tmp/data_local/seen.json"))
+          os.makedirs("data", exist_ok=True)
+          with open("data/seen.json", "w", encoding="utf-8") as f:
+              json.dump(remote, f, ensure_ascii=False, indent=1, sort_keys=True)
+
+          # leads.csv: uzak satırların üstüne yerelden eksik satırları ekle
+          def read_lines(p):
+              return open(p, encoding="utf-8").read().splitlines() if os.path.exists(p) else []
+          remote_rows = read_lines("data/leads.csv")
+          local_rows = read_lines("/tmp/data_local/leads.csv")
+          if local_rows:
+              header = local_rows[0]
+              existing = set(remote_rows)
+              merged = remote_rows or [header]
+              for row in local_rows[1:]:
+                  if row not in existing:
+                      merged.append(row)
+              with open("data/leads.csv", "w", encoding="utf-8") as f:
+                  f.write("\n".join(merged) + "\n")
+
+          # outreach sayfaları: benzersiz isimli, doğrudan kopyala
+          for src in glob.glob("/tmp/data_local/outreach/*.md"):
+              os.makedirs("data/outreach", exist_ok=True)
+              shutil.copy(src, os.path.join("data/outreach", os.path.basename(src)))
+          PY
+          git add data/
+          git commit -m "chore: günlük tarama çıktıları ($(date +%F), birleştirildi)"
+          git push origin HEAD:${{ github.ref_name }}
